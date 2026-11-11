@@ -74,6 +74,7 @@ Stop it with `.\scripts\stop-dashboard.ps1 -Window` (without `-Window` the app w
 
 **Start at sign-in:** `.\scripts\install-startup.ps1` adds a "Network Dashboard" shortcut to your Startup
 folder (no admin rights). `-LaunchArgs '-X 2560'` picks a monitor, and `-Remove` takes the shortcut away again.
+`-StartMenu` adds the same shortcut to the Start menu instead, to reopen the window after closing it.
 
 ## Configuration
 
