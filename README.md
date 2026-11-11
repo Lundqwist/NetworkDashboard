@@ -65,9 +65,15 @@ npm run launch                           # Edge/Chrome app window, no tabs or ad
 The layout fills the window exactly at 1920×1080 with the taskbar and title bar visible. It switches to a
 scrollable two-column layout when the window is smaller than about 1280×760.
 
-**Start at login:** press <kbd>Win</kbd>+<kbd>R</kbd>, type `shell:startup`, and put a shortcut to
-`start-dashboard.cmd` there. It starts the server minimised and opens the window.
-Arguments are passed through, e.g. a shortcut target of `start-dashboard.cmd -X -1920`.
+Without `-X`/`-Y`, `launch.ps1` picks the leftmost non-primary 1920×1080 screen by itself.
+
+**Run in the background:** `start-dashboard.cmd` starts the server with no console window
+(`conhost --headless`), restarts it if it crashes, and opens the app window if it isn't open yet.
+Logs are in `%LOCALAPPDATA%\NetworkDashboard` (`server-out.log`, `server-err.log`, `server.log`).
+Stop it with `.\scripts\stop-dashboard.ps1 -Window` (without `-Window` the app window stays open).
+
+**Start at sign-in:** `.\scripts\install-startup.ps1` adds a "Network Dashboard" shortcut to your Startup
+folder (no admin rights). `-LaunchArgs '-X 2560'` picks a monitor, and `-Remove` takes the shortcut away again.
 
 ## Configuration
 
@@ -217,7 +223,7 @@ Common snapshot URLs:
 | Hikvision | `http://CAM/ISAPI/Streaming/channels/101/picture` (Digest) |
 | Dahua / Amcrest | `http://CAM/cgi-bin/snapshot.cgi` (Digest) |
 | Axis | `http://CAM/axis-cgi/jpg/image.cgi` |
-| Tapo / RTSP-only cameras | run [go2rtc](https://github.com/AlexxIT/go2rtc), then `http://GO2RTC:1984/api/frame.jpeg?src=hallway` |
+| Tapo / RTSP-only cameras | run [go2rtc](https://github.com/AlexxIT/go2rtc), then `http://GO2RTC:1984/api/frame.jpeg?src=hallway`; live: add a stream `hallway_mjpeg: ffmpeg:hallway#video=mjpeg` and set `"mjpegUrl": "http://GO2RTC:1984/api/stream.mjpeg?src=hallway_mjpeg"`. Set an API `username`/`password` in go2rtc and use them here |
 | Frigate | `http://FRIGATE:5000/api/hallway/latest.jpg` |
 | Home Assistant | `http://HA:8123/api/camera_proxy/camera.hallway` + `"headers": {"Authorization": "Bearer TOKEN"}` |
 

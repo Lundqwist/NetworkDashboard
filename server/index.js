@@ -193,6 +193,7 @@ app.get('/api/camera/:id/snapshot', async (req, res) => {
   try {
     const r = await camera.cameraRequest(p, p.snapshotUrl);
     if (r.status !== 200) return res.status(502).send(`Camera answered HTTP ${r.status}`);
+    if (!r.body.length) return res.status(502).send('Camera returned no image');
     res.type(r.headers['content-type'] || 'image/jpeg').send(r.body);
   } catch (e) {
     res.status(502).send(e.message);
