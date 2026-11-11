@@ -15,7 +15,19 @@ if (-not (Test-Up)) {
   for ($i = 0; $i -lt 60 -and -not (Test-Up); $i++) { Start-Sleep 1 }
 }
 
-# Don't open a second window if the dashboard window is already open.
+# If the dashboard window is already open, bring it to the front instead of opening a second one.
 $open = Get-CimInstance Win32_Process -Filter "Name='msedge.exe' OR Name='chrome.exe'" |
-  Where-Object { $_.CommandLine -match '--app=' -and $_.CommandLine -match 'NetworkDashboard' }
-if (-not $open) { & "$PSScriptRoot\launch.ps1" @LaunchArgs }
+  Where-Object { $_.CommandLine -match '--app=' -and $_.CommandLine -match 'NetworkDashboard' -and $_.CommandLine -notmatch '--type=' }
+$hwnd = $open | ForEach-Object { (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).MainWindowHandle } |
+  Where-Object { $_ -and $_ -ne [IntPtr]::Zero } | Select-Object -First 1
+if ($hwnd) {
+  Add-Type -Namespace Ndb -Name Win -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+'@
+  if ([Ndb.Win]::IsIconic($hwnd)) { [void][Ndb.Win]::ShowWindow($hwnd, 9) }  # SW_RESTORE
+  [void][Ndb.Win]::SetForegroundWindow($hwnd)
+} elseif (-not $open) {
+  & "$PSScriptRoot\launch.ps1" @LaunchArgs
+}
