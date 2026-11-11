@@ -1,0 +1,17 @@
+[Unit]
+Description=Network Dashboard metrics agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Change the user if you want docker access (add it to the "docker" group).
+User=pi
+Environment=DASHBOARD_AGENT_TOKEN=change-me
+Environment=DASHBOARD_AGENT_SERVICES=pihole-FTL
+ExecStart=/usr/bin/python3 /opt/dashboard-agent/dashboard_agent.py --docker --apt
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

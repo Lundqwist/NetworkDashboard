@@ -1,0 +1,29 @@
+{
+  "name": "network-dashboard",
+  "version": "1.0.0",
+  "description": "A self-hosted home network dashboard for a 1920x1080 side monitor: PC, Raspberry Pi, NAS, Pi-hole, websites, camera, printer, tasks, network and weather.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "demo": "node server/index.js --demo",
+    "dev": "node --watch server/index.js",
+    "launch": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "keywords": [
+    "dashboard",
+    "homelab",
+    "raspberry-pi",
+    "pi-hole",
+    "synology",
+    "monitoring"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.1.0",
+    "systeminformation": "^5.27.0"
+  }
+}

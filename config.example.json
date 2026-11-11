@@ -1,0 +1,114 @@
+{
+  "title": "Home Network",
+  "host": "127.0.0.1",
+  "port": 3000,
+  "locale": null,
+  "clock24h": true,
+  "pollInterval": 2,
+  "layout": {
+    "columns": 4,
+    "rows": 3,
+    "areas": [
+      "pc      pi       pihole   camera",
+      "pc      nas      website  tasks",
+      "network printer  weather  tasks"
+    ]
+  },
+  "panels": [
+    {
+      "id": "pc",
+      "type": "local",
+      "title": "This PC",
+      "refresh": 3
+    },
+    {
+      "id": "pi",
+      "type": "agent",
+      "title": "Raspberry Pi 5",
+      "url": "http://raspberrypi.local:61209",
+      "token": "${PI_AGENT_TOKEN}",
+      "refresh": 5
+    },
+    {
+      "id": "nas",
+      "type": "synology",
+      "title": "NAS",
+      "url": "https://nas.local:5001",
+      "username": "dashboard",
+      "password": "${NAS_PASSWORD}",
+      "insecure": true,
+      "refresh": 15
+    },
+    {
+      "id": "pihole",
+      "type": "pihole",
+      "title": "Pi-hole",
+      "url": "http://pi.hole",
+      "password": "${PIHOLE_PASSWORD}",
+      "version": 6,
+      "refresh": 15
+    },
+    {
+      "id": "website",
+      "type": "http",
+      "title": "Website & Server",
+      "refresh": 60,
+      "sites": [
+        { "name": "Website", "url": "https://example.com" },
+        { "name": "API", "url": "https://example.com/api/health" },
+        { "name": "Admin", "url": "https://example.com/admin", "expectStatus": 200 }
+      ],
+      "host": {
+        "type": "agent",
+        "url": "http://my-server:61209",
+        "token": "${SERVER_AGENT_TOKEN}"
+      }
+    },
+    {
+      "id": "camera",
+      "type": "camera",
+      "title": "Hallway Camera",
+      "snapshotUrl": "http://hallway-cam.local/snapshot.jpg",
+      "username": "viewer",
+      "password": "${CAMERA_PASSWORD}",
+      "refresh": 2
+    },
+    {
+      "id": "printer",
+      "type": "printer",
+      "title": "Printer",
+      "protocol": "ipp",
+      "host": "printer.local",
+      "refresh": 30
+    },
+    {
+      "id": "tasks",
+      "type": "tasks",
+      "title": "Tasks"
+    },
+    {
+      "id": "network",
+      "type": "network",
+      "title": "Network",
+      "refresh": 10,
+      "devices": [
+        { "name": "Router", "host": "192.168.1.1" },
+        { "name": "Internet (1.1.1.1)", "host": "1.1.1.1" },
+        { "name": "Raspberry Pi 5", "host": "raspberrypi.local" },
+        { "name": "NAS", "host": "nas.local" },
+        { "name": "Pi-hole DNS", "host": "pi.hole", "port": 53 },
+        { "name": "Printer", "host": "printer.local" },
+        { "name": "Hallway camera", "host": "hallway-cam.local" }
+      ]
+    },
+    {
+      "id": "weather",
+      "type": "weather",
+      "title": "Weather",
+      "location": "Stockholm",
+      "latitude": 59.3293,
+      "longitude": 18.0686,
+      "refresh": 900
+    }
+  ]
+}

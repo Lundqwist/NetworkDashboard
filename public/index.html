@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Network Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233987e5' stroke-width='2.2' stroke-linecap='round'><rect x='3' y='3' width='8' height='8' rx='2'/><rect x='13' y='3' width='8' height='8' rx='2'/><rect x='3' y='13' width='8' height='8' rx='2'/><rect x='13' y='13' width='8' height='8' rx='2'/></svg>">
+    <link rel="stylesheet" href="/css/dashboard.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="top-left">
+          <span id="summary"></span>
+          <span id="demo-badge" class="chip warn hidden" title="Showing generated data – create config.json to use your devices"><i>▲</i>Demo data</span>
+          <span class="offline-badge chip crit"><i>✕</i>Dashboard server unreachable</span>
+        </div>
+        <div class="top-center">
+          <div id="clock"></div>
+          <div id="date"></div>
+        </div>
+        <div class="top-right" id="header-weather"></div>
+      </header>
+      <main id="grid" class="grid"></main>
+    </div>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>
