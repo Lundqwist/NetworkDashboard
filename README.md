@@ -1,10 +1,12 @@
-# Network Dashboard
+# <img src="public/icon.svg" alt="" width="40" align="top"> Network Dashboard
 
 A self-hosted, always-on home network dashboard designed for a **1920×1080 side monitor**.
 One screen shows your PC, Raspberry Pi, NAS, Pi-hole, website and server, hallway camera,
 printer, task list, network reachability and weather, refreshing every few seconds.
 
-![Network Dashboard screenshot (demo data)](docs/screenshot.png)
+![Network Dashboard at 1920×1080 with demo data: PC, Raspberry Pi, NAS, Pi-hole, website checks, camera, tasks, network, printer and weather panels](docs/screenshot.png)
+
+*The full layout at 1920×1080 with demo data (`npm run demo`).*
 
 - **No build step, no cloud.** It's a small Node.js server plus a plain HTML/CSS/JS frontend.
 - **Secrets stay on the server.** Camera images, Pi-hole and NAS calls are proxied. The browser never sees credentials.
