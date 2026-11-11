@@ -1,5 +1,6 @@
 // Printers: any IPP/AirPrint network printer (ink/toner levels and status),
 // or 3D printers via OctoPrint or Moonraker (Klipper/Mainsail/Fluidd).
+import { execFile } from 'node:child_process';
 import { getPrinterAttributes } from '../lib/ipp.js';
 import { request, trimSlash } from '../lib/http.js';
 
@@ -99,10 +100,73 @@ async function moonraker(panel) {
   };
 }
 
+/* ----------------- Windows print queue (USB printers, no admin needed) ----------------- */
+
+// Win32_Printer.DetectedErrorState -> text and severity (2 = no error, 0/1 = unknown/other).
+const WIN_ERRORS = {
+  3: ['Low paper', 'warning'], 4: ['No paper', 'error'], 5: ['Low toner', 'warning'], 6: ['No toner', 'error'],
+  7: ['Door open', 'error'], 8: ['Paper jam', 'error'], 9: ['Offline', 'error'], 10: ['Service requested', 'error'],
+  11: ['Output bin full', 'warning'],
+};
+// Win32_Printer.PrinterStatus
+const WIN_STATUS = { 3: 'idle', 4: 'printing', 5: 'printing', 6: 'stopped', 7: 'offline' };
+
+function powershell(script, timeout = 15000) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { timeout, windowsHide: true, maxBuffer: 1e6 },
+      (err, stdout) => (err ? reject(new Error(`Printer query failed: ${err.message.split('\n')[0]}`)) : resolve(String(stdout))),
+    );
+  });
+}
+
+async function windowsPrinter(panel) {
+  if (process.platform !== 'win32') throw new Error('protocol "windows" only works when the dashboard runs on Windows');
+  const name = String(panel.name || '').replace(/'/g, "''");
+  if (!name) throw new Error('Set "name" to the Windows printer name (see Get-Printer)');
+  const out = await powershell(`
+    [Console]::OutputEncoding = [Text.Encoding]::UTF8
+    $p = Get-CimInstance Win32_Printer -Filter "Name='${name.replace(/"/g, '')}'"
+    if (-not $p) { '{"missing":true}'; exit }
+    $jobs = @(Get-PrintJob -PrinterName '${name}' -ErrorAction SilentlyContinue)
+    $dev = Get-PnpDevice -Class Printer -PresentOnly -ErrorAction SilentlyContinue | Where-Object FriendlyName -eq $p.DriverName | Select-Object -First 1
+    [pscustomobject]@{
+      driver = $p.DriverName; port = $p.PortName; status = $p.PrinterStatus; error = $p.DetectedErrorState
+      offline = [bool]$p.WorkOffline; jobs = $jobs.Count
+      jobErrors = @($jobs | Where-Object { $_.JobStatus -match 'Error|Blocked|Paper' }).Count
+      connected = if ($p.PortName -like 'USB*') { [bool]$dev } else { $true }
+    } | ConvertTo-Json -Compress`);
+  const j = JSON.parse(out.trim() || '{}');
+  if (j.missing) throw new Error(`Windows has no printer named "${panel.name}"`);
+  const reasons = [];
+  if (WIN_ERRORS[j.error]) reasons.push({ text: WIN_ERRORS[j.error][0], severity: WIN_ERRORS[j.error][1] });
+  if (!j.connected) reasons.push({ text: 'USB printer not connected or switched off', severity: 'error' });
+  if (j.jobErrors) reasons.push({ text: `${j.jobErrors} job${j.jobErrors > 1 ? 's' : ''} with errors`, severity: 'error' });
+  let state = WIN_STATUS[j.status] || (j.jobs ? 'printing' : 'idle');
+  if (j.offline || !j.connected) state = 'offline';
+  else if (reasons.some((r) => r.severity === 'error')) state = 'error';
+  return {
+    kind: 'ipp',
+    name: panel.name,
+    model: j.driver,
+    location: j.port,
+    state,
+    message: j.port ? `on ${j.port}` : null,
+    jobs: j.jobs || 0,
+    reasons,
+    // Windows' print API exposes no toner levels for USB printers.
+    markers: [],
+  };
+}
+
 export async function collect(panel) {
   switch (panel.protocol || 'ipp') {
     case 'ipp':
       return ipp(panel);
+    case 'windows':
+      return windowsPrinter(panel);
     case 'octoprint':
       return octoprint(panel);
     case 'moonraker':

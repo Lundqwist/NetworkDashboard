@@ -1,0 +1,26 @@
+# Network Dashboard agent on a Synology NAS (or any Docker host), read-only and unprivileged.
+# Put this file, dashboard_agent.py and a .env with DASHBOARD_AGENT_TOKEN=<token> (mode 600) in one folder,
+# e.g. /volume1/docker/dashboard-agent, then: docker compose up -d
+#
+# - network_mode host: reports the NAS's own network counters and hostname; listens on port 61209.
+# - /volume1 is NOT mounted. An empty folder on volume1 is mounted there instead, which is enough for
+#   the agent to read the volume's size and free space, without the container seeing any of your files.
+# - CPU/RAM/uptime come from /proc and temperatures from /sys, which a container can read anyway.
+services:
+  dashboard-agent:
+    image: python:3.13-alpine
+    container_name: dashboard-agent
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file: .env
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["python", "/agent/dashboard_agent.py", "--port", "61209", "--mounts", "/volume1"]
+    volumes:
+      - ./dashboard_agent.py:/agent/dashboard_agent.py:ro
+      - ./volume-probe:/volume1:ro
+      - /etc.defaults/VERSION:/host/VERSION:ro   # DSM version, shown as the OS

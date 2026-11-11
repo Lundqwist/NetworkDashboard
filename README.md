@@ -92,6 +92,11 @@ Arguments are passed through, e.g. a shortcut target of `start-dashboard.cmd -X 
 }
 ```
 
+Devices with a self-made certificate authority (Pi-hole, many routers) can be checked with full
+certificate validation instead of `"insecure": true`. List their root CA files (PEM) at the top level:
+`"extraCaCerts": ["certs/pi-hole-root-ca.crt"]`. Node.js doesn't use the Windows certificate store,
+so trusting the CA in Windows isn't enough.
+
 A panel only appears if its `id` is in `layout.areas`. A panel spanning two rows (like `pc`
 above) automatically shows extra charts (network graph and per-thread load).
 Every panel accepts `id`, `type`, `title`, `refresh` (seconds), `icon`, and `"enabled": false`.
@@ -102,9 +107,19 @@ Every panel accepts `id`, `type`, `title`, `refresh` (seconds), `icon`, and `"en
 { "id": "pc", "type": "local", "title": "This PC", "refresh": 3 }
 ```
 
-GPU load and temperature work for NVIDIA cards (through `nvidia-smi`). On Windows, CPU temperature
-usually needs admin rights. If it shows "no sensor", run the dashboard elevated, or
-[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) with its WMI provider.
+GPU load and temperature work for NVIDIA cards (through `nvidia-smi`). Everything else runs as a
+normal user, so **don't run the dashboard as administrator**.
+
+On Windows, the CPU temperature can't be read without a kernel driver, so it shows "no sensor" by default.
+To get it, run [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
+(which runs elevated) with **Options → Remote Web Server** enabled on port 8085, and set `lhmUrl`:
+
+```json
+{ "id": "pc", "type": "local", "title": "This PC", "refresh": 3, "lhmUrl": "http://127.0.0.1:8085" }
+```
+
+`scripts\setup-cpu-temp-admin.ps1` (run it yourself as administrator) installs LibreHardwareMonitor and
+starts it elevated at sign-in. Only LibreHardwareMonitor runs elevated; the dashboard stays unelevated.
 
 ### Raspberry Pi 5 and other Linux hosts (`agent`)
 
@@ -150,6 +165,11 @@ Create a dedicated DSM user (Control Panel → User) **without 2-step verificati
 
 `insecure: true` accepts the NAS's self-signed certificate. Not on Synology? Use `glances` or
 `agent` instead.
+
+**Without a DSM admin account:** run the agent in Docker on the NAS with
+[agent/synology/compose.yaml](agent/synology/compose.yaml) and use an `agent` panel. It runs unprivileged
+and read-only and can't see your files. You get CPU, RAM, temperature, volume usage and network, but not
+RAID status or drive health.
 
 ### Pi-hole (`pihole`)
 
@@ -210,6 +230,8 @@ Almost every network printer made in the last decade speaks IPP (AirPrint), so n
 ```
 
 Optional: `port` (631), `path` (`/ipp/print`), or a full `"uri": "ipps://printer.local/ipp/print"`.
+A USB printer on the dashboard PC (Windows): `"protocol": "windows", "name": "<name from Get-Printer>"`.
+That shows state, queued jobs and driver-reported errors (no paper, jam, low toner), but no toner levels.
 For a 3D printer, use `"protocol": "octoprint"` with `url` and `apiKey`, or `"protocol": "moonraker"` with `url`.
 
 ### Tasks (`tasks`)
@@ -218,7 +240,18 @@ For a 3D printer, use `"protocol": "octoprint"` with `url` and `apiKey`, or `"pr
 { "id": "tasks", "type": "tasks", "title": "Tasks" }
 ```
 
-Tasks are stored in `data/tasks.json` (change with top-level `"tasksFile"`). Quick-add syntax:
+To show a [Vikunja](https://vikunja.io) task list instead, add `"source": "vikunja"`:
+
+```json
+{ "id": "tasks", "type": "tasks", "title": "Tasks", "source": "vikunja",
+  "url": "http://vikunja:3456", "token": "${VIKUNJA_TOKEN}", "defaultProject": 1, "refresh": 30 }
+```
+
+It shows open tasks from all projects (or only `"projects": [1, 2]`) plus those completed in the last 24 h.
+Ticking, starring (Vikunja priority 3) and adding work as usual; new tasks go to `defaultProject`.
+Deleting is turned off in this mode, and "Clear completed" only hides tasks on the dashboard.
+
+Otherwise tasks are stored in `data/tasks.json` (change with top-level `"tasksFile"`). Quick-add syntax:
 `Buy toner ! @fri` means important and due Friday. Supported: `!`, `@today`, `@tomorrow`,
 `@mon`…`@sun`, `@+3` (in 3 days), `@2026-12-24`. Click ☆ to toggle priority, hover a task to delete it.
 

@@ -188,12 +188,18 @@ def meminfo():
 
 def disks(extra):
     out, seen = [], set()
-    for line in (read("/proc/mounts", "") or "").splitlines():
+    lines = (read("/proc/mounts", "") or "").splitlines()
+    # Mounts asked for with --mounts come first, so they win the per-device de-duplication.
+    lines.sort(key=lambda l: 0 if len(l.split()) > 1 and l.split()[1].replace("\\040", " ") in extra else 1)
+    for line in lines:
         dev, mnt, fs = line.split()[:3]
         mnt = mnt.replace("\\040", " ")
         if fs not in REAL_FS or mnt.startswith(SKIP_MOUNT_PREFIXES) and mnt not in extra:
             continue
         if dev in seen:
+            continue
+        # In a container, /etc/hosts etc. are file bind mounts on the host disk; skip them.
+        if not os.path.isdir(mnt):
             continue
         try:
             st = os.statvfs(mnt)
@@ -207,7 +213,23 @@ def disks(extra):
     return out
 
 
+def synology_version():
+    """DSM version from /etc.defaults/VERSION (mounted at /host/VERSION in the container)."""
+    for path in ("/etc.defaults/VERSION", "/host/VERSION"):
+        text = read(path)
+        if text:
+            kv = dict(l.split("=", 1) for l in text.splitlines() if "=" in l)
+            get = lambda k: kv.get(k, "").strip().strip('"')
+            if get("productversion"):
+                fix = f" Update {get('smallfixnumber')}" if get("smallfixnumber") not in ("", "0") else ""
+                return f"DSM {get('productversion')}-{get('buildnumber')}{fix}"
+    return None
+
+
 def os_name():
+    dsm = synology_version()
+    if dsm:
+        return dsm
     for line in (read("/etc/os-release", "") or "").splitlines():
         if line.startswith("PRETTY_NAME="):
             return line.split("=", 1)[1].strip('"')
@@ -215,6 +237,9 @@ def os_name():
 
 
 def model():
+    syno = (read("/proc/sys/kernel/syno_hw_version") or "").strip()
+    if syno:
+        return f"Synology {syno}"
     m = read("/proc/device-tree/model") or read("/sys/firmware/devicetree/base/model")
     if m:
         return m.replace("\x00", "").strip()
@@ -288,7 +313,8 @@ def make_handler(args, sampler, slow):
                 return self._send(404, '{"error":"not found"}')
             if args.token:
                 given = self.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-                if not hmac.compare_digest(given, args.token):
+                # Compare bytes: compare_digest raises TypeError on non-ASCII str input.
+                if not hmac.compare_digest(given.encode("utf-8", "replace"), args.token.encode("utf-8")):
                     return self._send(401, '{"error":"unauthorized"}')
             self._send(200, json.dumps(build_stats(args, sampler, slow)))
 
@@ -313,6 +339,7 @@ def main():
     p.add_argument("--docker", action="store_true", help="report docker containers (user needs docker access)")
     p.add_argument("--apt", action="store_true", help="report number of pending apt upgrades (checked hourly)")
     args = p.parse_args()
+    args.token = args.token.strip().lstrip("﻿")  # tolerate a pasted BOM/newline
     args.services = [s.strip() for s in args.services.split(",") if s.strip()]
     args.mounts = [s.strip() for s in args.mounts.split(",") if s.strip()]
     if not args.token:

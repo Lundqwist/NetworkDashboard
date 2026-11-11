@@ -1,6 +1,7 @@
 // "This PC" – the machine the dashboard server runs on.
 import si from 'systeminformation';
 import { withHostHistory } from '../lib/history.js';
+import { request, trimSlash } from '../lib/http.js';
 
 export const defaultRefresh = 3;
 
@@ -14,6 +15,46 @@ function background(ctx, key, maxAgeMs, fn) {
       .finally(() => { c.t = Date.now(); c.running = null; });
   }
   return c;
+}
+
+/**
+ * CPU temperature from LibreHardwareMonitor's built-in web server (Options → Remote Web Server,
+ * default http://localhost:8085). Reading real CPU sensors on Windows needs a kernel driver, so
+ * LHM runs elevated while the dashboard itself stays a normal, unelevated process.
+ */
+const LHM_PREFERRED = [/^cpu package$/i, /^core \(tctl\/tdie\)$/i, /^core max$/i, /^core average$/i];
+
+export function lhmCpuTemp(tree) {
+  const found = [];
+  const walk = (node, inCpu) => {
+    const cpu = inCpu || /cpu/i.test(node.ImageURL || '') || /^\/(intel|amd)cpu\//.test(node.SensorId || '');
+    const isTemp = node.Type === 'Temperature' || /°C/.test(node.Value || '');
+    if (cpu && isTemp && node.Value) {
+      const v = parseFloat(String(node.Value).replace(',', '.'));
+      if (Number.isFinite(v) && v > 0) found.push({ text: String(node.Text || ''), v });
+    }
+    for (const c of node.Children || []) walk(c, cpu);
+  };
+  walk(tree || {}, false);
+  for (const re of LHM_PREFERRED) {
+    const hit = found.find((f) => re.test(f.text));
+    if (hit) return hit.v;
+  }
+  return found.length ? Math.max(...found.map((f) => f.v)) : null;
+}
+
+async function cpuTemperature(panel) {
+  if (panel.lhmUrl) {
+    try {
+      const res = await request(`${trimSlash(panel.lhmUrl)}/data.json`, { timeout: 3000 });
+      if (res.status === 200) {
+        const t = lhmCpuTemp(res.json());
+        if (t != null) return { main: t };
+      }
+    } catch { /* LHM not running – fall back */ }
+  }
+  // Without admin rights Windows' ACPI thermal zone is not readable, so this is usually null there.
+  return si.cpuTemperature();
 }
 
 const VIRTUAL_GPU = /basic display|basic render|virtual|parsec|remote|idd|meta/i;
@@ -42,7 +83,7 @@ export async function collect(panel, ctx) {
 
   const disks = background(ctx, 'disks', 60_000, () => si.fsSize());
   const gpu = background(ctx, 'gpu', 8_000, () => si.graphics());
-  const temp = background(ctx, 'temp', 10_000, () => si.cpuTemperature());
+  const temp = background(ctx, 'temp', 10_000, () => cpuTemperature(panel));
 
   const [load, mem, net, time] = await Promise.all([
     si.currentLoad(),

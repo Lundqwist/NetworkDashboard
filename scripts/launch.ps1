@@ -3,8 +3,8 @@
   Opens the dashboard as a chrome-less app window on your side monitor.
 
 .EXAMPLE
-  .\scripts\launch.ps1                       # monitor to the right of the main screen
-  .\scripts\launch.ps1 -X -1920              # monitor to the left
+  .\scripts\launch.ps1                       # first 1920x1080 side monitor (leftmost), found automatically
+  .\scripts\launch.ps1 -X 2560               # a specific monitor: its top-left corner in Windows display coordinates
   .\scripts\launch.ps1 -Kiosk                # true full screen (F11-style)
 #>
 param(
@@ -15,6 +15,15 @@ param(
   [int]$Height = 1080,
   [switch]$Kiosk
 )
+
+# Without -X/-Y: use the first non-primary screen of the requested size (falls back to any
+# non-primary screen, then to 1920,0).
+if (-not $PSBoundParameters.ContainsKey('X') -and -not $PSBoundParameters.ContainsKey('Y')) {
+  Add-Type -AssemblyName System.Windows.Forms
+  $others = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Sort-Object { $_.Bounds.X }
+  $screen = @($others | Where-Object { $_.Bounds.Width -eq $Width -and $_.Bounds.Height -eq $Height }) + @($others) | Select-Object -First 1
+  if ($screen) { $X = $screen.Bounds.X; $Y = $screen.Bounds.Y }
+}
 
 $candidates = @(
   "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",

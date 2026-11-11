@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import tls from 'node:tls';
+import https from 'node:https';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 
@@ -15,6 +17,7 @@ import * as network from './collectors/network.js';
 import * as weather from './collectors/weather.js';
 import * as demo from './demo.js';
 import { TaskStore } from './tasks.js';
+import { VikunjaStore } from './vikunja-tasks.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -45,6 +48,27 @@ function expandEnv(v) {
 const configPath = resolveConfigPath();
 const demoMode = DEMO || configPath.endsWith('config.example.json');
 const config = expandEnv(JSON.parse(fs.readFileSync(configPath, 'utf8')));
+// Extra root CAs (e.g. Pi-hole's or a router's self-made CA), so those devices can be
+// checked with full certificate validation instead of "insecure": true. Node doesn't use
+// the Windows certificate store, so trusting a CA there isn't enough.
+const extraCas = [config.extraCaCerts || []].flat().filter(Boolean);
+if (extraCas.length) {
+  const pems = extraCas.map((f) => {
+    const file = path.resolve(ROOT, f);
+    try {
+      return fs.readFileSync(file, 'utf8');
+    } catch (e) {
+      throw new Error(`[config] extraCaCerts: cannot read ${file}: ${e.message}`);
+    }
+  });
+  if (typeof tls.setDefaultCACertificates === 'function') {
+    tls.setDefaultCACertificates([...tls.getCACertificates('default'), ...pems]);
+  } else {
+    // Node < 22.19 / 24.5: the shared agent's options apply to every request in lib/http.js.
+    https.globalAgent.options.ca = [...tls.rootCertificates, ...pems];
+  }
+}
+
 const panels = (config.panels || []).filter((p) => p.enabled !== false);
 const panelsById = new Map(panels.map((p) => [p.id, p]));
 
@@ -52,7 +76,11 @@ const panelsById = new Map(panels.map((p) => [p.id, p]));
 
 const collectors = { local, agent, glances, synology, pihole, http: httpCheck, camera, printer, network, weather };
 const tasksFile = demoMode ? 'data/tasks.demo.json' : config.tasksFile || 'data/tasks.json';
-const tasks = await new TaskStore(path.resolve(ROOT, tasksFile)).load();
+const tasksPanel = panels.find((p) => p.type === 'tasks');
+const tasks =
+  !demoMode && tasksPanel?.source === 'vikunja'
+    ? await new VikunjaStore(tasksPanel).load()
+    : await new TaskStore(path.resolve(ROOT, tasksFile)).load();
 if (demoMode && tasks.tasks.length === 0) {
   for (const t of [
     { text: 'Renew domain for the website', priority: true, due: new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10) },
@@ -111,7 +139,7 @@ app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(ROOT, 'public'), { extensions: ['html'] }));
 
 // Only non-secret, display-relevant options are sent to the browser.
-const PUBLIC_KEYS = ['id', 'type', 'title', 'icon', 'refresh', 'protocol', 'location', 'aspect', 'mode'];
+const PUBLIC_KEYS = ['id', 'type', 'title', 'icon', 'refresh', 'protocol', 'location', 'aspect', 'mode', 'source'];
 app.get('/api/config', (_req, res) => {
   res.json({
     title: config.title || 'Network Dashboard',
@@ -131,7 +159,10 @@ app.get('/api/state', (_req, res) => {
   const out = {};
   for (const [id, s] of state) {
     const { refresh, ...rest } = s;
-    out[id] = s.type === 'tasks' ? { ...rest, data: { tasks: tasks.list() }, updatedAt: Date.now() } : rest;
+    out[id] =
+      s.type === 'tasks'
+        ? { ...rest, status: tasks.error ? 'error' : 'ok', error: tasks.error ?? null, data: { tasks: tasks.list() }, updatedAt: Date.now() }
+        : rest;
   }
   res.set('Cache-Control', 'no-store').json({ time: Date.now(), panels: out });
 });
@@ -208,7 +239,7 @@ app.post('/api/tasks', async (req, res) => {
   try {
     res.status(201).json(await tasks.add(req.body || {}));
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(/required/.test(e.message) ? 400 : 502).json({ error: e.message });
   }
 });
 app.post('/api/tasks/clear-done', async (_req, res) => {
@@ -216,8 +247,12 @@ app.post('/api/tasks/clear-done', async (_req, res) => {
   res.json({ ok: true });
 });
 app.patch('/api/tasks/:id', async (req, res) => {
-  const t = await tasks.update(req.params.id, req.body || {});
-  t ? res.json(t) : res.status(404).json({ error: 'Not found' });
+  try {
+    const t = await tasks.update(req.params.id, req.body || {});
+    t ? res.json(t) : res.status(404).json({ error: 'Not found' });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
 });
 app.delete('/api/tasks/:id', async (req, res) => {
   (await tasks.remove(req.params.id)) ? res.json({ ok: true }) : res.status(404).json({ error: 'Not found' });

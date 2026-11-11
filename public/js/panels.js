@@ -485,19 +485,20 @@ const tasks = {
       api.poll();
     });
   },
-  update(body, d) {
+  update(body, d, cfg) {
     const list = d.tasks || [];
     const open = list.filter((t) => !t.done).length;
-    body.querySelector('.count').textContent = `${open} open · ${list.length - open} done`;
+    const vikunja = cfg?.source === 'vikunja';
+    body.querySelector('.count').textContent = `${open} open · ${list.length - open} done${vikunja ? ' · Vikunja' : ''}`;
     body.querySelector('.task-list').innerHTML =
       list
         .map(
           (t) => `<li class="task ${t.done ? 'done' : ''}" data-id="${esc(t.id)}">
             <button class="check" data-act="toggle" role="checkbox" aria-checked="${t.done}" title="${t.done ? 'Mark as open' : 'Mark as done'}">${t.done ? '✓' : ''}</button>
-            <span class="task-text">${esc(t.text)}</span>
+            <span class="task-text">${esc(t.text)}${t.repeats ? ' <span class="muted" title="Repeating task">↻</span>' : ''}${t.project ? ` <span class="muted small">· ${esc(t.project)}</span>` : ''}</span>
             ${t.done ? '' : dueChip(t.due)}
             <button class="star ${t.priority ? 'on' : ''}" data-act="star" aria-pressed="${t.priority}" title="Important">${t.priority ? '★' : '☆'}</button>
-            <button class="del" data-act="del" title="Delete">✕</button>
+            ${vikunja ? '' : '<button class="del" data-act="del" title="Delete">✕</button>'}
           </li>`,
         )
         .join('') || '<li class="empty">Nothing to do 🎉</li>';
