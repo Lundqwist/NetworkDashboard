@@ -25,6 +25,8 @@ if (-not $PSBoundParameters.ContainsKey('X') -and -not $PSBoundParameters.Contai
   if ($screen) { $X = $screen.Bounds.X; $Y = $screen.Bounds.Y }
 }
 
+if (-not $Url) { $Url = "http://localhost:3000" }  # never open the browser without an address
+
 $candidates = @(
   "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
   "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",

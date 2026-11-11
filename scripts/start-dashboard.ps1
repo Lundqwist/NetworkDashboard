@@ -29,5 +29,8 @@ if ($hwnd) {
   if ([Ndb.Win]::IsIconic($hwnd)) { [void][Ndb.Win]::ShowWindow($hwnd, 9) }  # SW_RESTORE
   [void][Ndb.Win]::SetForegroundWindow($hwnd)
 } elseif (-not $open) {
-  & "$PSScriptRoot\launch.ps1" @LaunchArgs
+  # Splatting an empty $LaunchArgs in PowerShell 5.1 passes $null as -Url, which opened Edge with no
+  # address (a plain browser window). Only pass arguments when there are some.
+  $extra = @($LaunchArgs | Where-Object { $null -ne $_ -and "$_" -ne '' })
+  if ($extra.Count) { & "$PSScriptRoot\launch.ps1" @extra } else { & "$PSScriptRoot\launch.ps1" }
 }
