@@ -15,6 +15,7 @@ import * as camera from './collectors/camera.js';
 import * as printer from './collectors/printer.js';
 import * as network from './collectors/network.js';
 import * as weather from './collectors/weather.js';
+import * as news from './collectors/news.js';
 import * as demo from './demo.js';
 import { TaskStore } from './tasks.js';
 import { VikunjaStore } from './vikunja-tasks.js';
@@ -74,7 +75,7 @@ const panelsById = new Map(panels.map((p) => [p.id, p]));
 
 /* ----------------------------- collectors ----------------------------- */
 
-const collectors = { local, agent, glances, synology, pihole, http: httpCheck, camera, printer, network, weather };
+const collectors = { local, agent, glances, synology, pihole, http: httpCheck, camera, printer, network, weather, news };
 const tasksFile = demoMode ? 'data/tasks.demo.json' : config.tasksFile || 'data/tasks.json';
 const tasksPanel = panels.find((p) => p.type === 'tasks');
 const tasks =

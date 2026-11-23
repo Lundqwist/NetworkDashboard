@@ -288,6 +288,17 @@ for devices that ignore ping.
 
 Optional: `"temperatureUnit": "fahrenheit"`, `"windUnit": "kmh" | "mph" | "ms"`.
 
+### News (`news`)
+
+Headlines for a feed consumer such as the TV app (the browser dashboard has no news renderer yet).
+
+```json
+{ "id": "news", "type": "news", "title": "CNN", "format": "cnn-lite", "url": "https://lite.cnn.com/", "limit": 30, "refresh": 600 }
+```
+
+`format` is `"cnn-lite"` (the headline list on CNN's text-only site; CNN's RSS feeds stopped updating
+in 2024) or `"rss"` for any RSS 2.0 / Atom feed. Each item has `title`, `section`, `date` and `url`.
+
 ## HTTP API
 
 | Method | Path | Purpose |
