@@ -89,6 +89,7 @@ folder (no admin rights). `-LaunchArgs '-X 2560'` picks a monitor, and `-Remove`
   "port": 3000,
   "locale": null,           // e.g. "sv-SE"; null = browser default
   "clock24h": true,
+  // optional: "readOnly", "cors", "allowedClients" (see "Running it as a LAN feed")
   "layout": {
     "columns": 4, "rows": 3,
     "areas": [               // CSS grid-template-areas, using panel ids; "." = empty cell
@@ -299,6 +300,26 @@ Optional: `"temperatureUnit": "fahrenheit"`, `"windUnit": "kmh" | "mph" | "ms"`.
 | GET/POST | `/api/tasks` | List or add tasks |
 | PATCH/DELETE | `/api/tasks/:id` | Update (`done`, `priority`, `text`, `due`) or delete |
 | POST | `/api/tasks/clear-done` | Remove completed tasks |
+
+## Running it as a LAN feed (Docker, read-only)
+
+The server can also run in a container on an always-on machine such as a Raspberry Pi, as a data
+feed for other screens (for example a TV app that reads `/api/state`). Three top-level options keep
+that safe:
+
+```jsonc
+{
+  "host": "0.0.0.0",
+  "readOnly": true,                        // only GET/HEAD: no task edits, no Pi-hole pause
+  "cors": true,                            // lets an app from another origin read the API
+  "allowedClients": ["192.168.1.50"],      // only these IPs may connect (localhost always may)
+  ...
+}
+```
+
+Build with the included `Dockerfile`, mount your config at `/app/config.json` and pass secrets as
+environment variables (`env_file`). Use `network_mode: host` so `allowedClients` sees real client
+IPs. The `local` and `printer` panel types need Windows, so leave them out there.
 
 ## Project layout
 

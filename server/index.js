@@ -135,6 +135,24 @@ panels.forEach(schedule);
 
 const app = express();
 app.disable('x-powered-by');
+
+// Optional guards for running the server as a LAN feed (e.g. on a Raspberry Pi for a TV app):
+//   "allowedClients": ["192.168.50.15"]  only these IPs may connect (127.0.0.1/::1 always may)
+//   "readOnly": true                      only GET/HEAD: no task edits, no Pi-hole pause
+//   "cors": true                          lets a packaged app (other origin) read the API
+const allowedClients = config.allowedClients?.length ? new Set(config.allowedClients) : null;
+app.use((req, res, next) => {
+  const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  if (allowedClients && !allowedClients.has(ip) && ip !== '127.0.0.1' && ip !== '::1') {
+    return res.status(403).type('text').send('Forbidden');
+  }
+  if (config.cors) res.set('Access-Control-Allow-Origin', '*');
+  if (config.readOnly && req.method !== 'GET' && req.method !== 'HEAD') {
+    return res.status(403).json({ error: 'This dashboard is read-only' });
+  }
+  next();
+});
+
 app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(ROOT, 'public'), { extensions: ['html'] }));
 
@@ -148,6 +166,7 @@ app.get('/api/config', (_req, res) => {
     pollInterval: config.pollInterval ?? 2,
     layout: config.layout,
     demo: demoMode,
+    readOnly: !!config.readOnly,
     panels: panels.map((p) => ({
       ...Object.fromEntries(PUBLIC_KEYS.filter((k) => k in p).map((k) => [k, p[k]])),
       ...(p.type === 'camera' ? { stream: !!p.mjpegUrl && !demoMode, refresh: p.refresh ?? 2 } : {}),
